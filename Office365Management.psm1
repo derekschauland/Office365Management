@@ -279,8 +279,30 @@ function check-o365status
 	
 }
 
+function update-o365primarymail
+{
+	param ([string[]]$emailaddress)
+	
+	$mailbox = get-mailbox -userprincipalname $emailaddress
+	
+	foreach ($mbx in $mailbox)
+	{
+		if ($mbx.windowsemailaddress -match "onmicrosoft.com")
+		{
+			$oldemail = $mbx.windowsemailaddress
+			
+			$mbx | set-mailbox -windowsmailaddress $mbx.userprinicpalname
+			
+			Write-Host "The Office 365 account for $($mbx.displayname) has been modified to change $oldemail to $($mbx.windowsemailaddress)"
+		}
+		else
+		{
+			Write-Host "The Office 365 account for $($mbx.displayname) already has the correct Email address - no changes needed/made."	
+		}
+	}
+}
 
-Export-ModuleMember check-o365status, enable-o365mailforward, connect-o365, disable-o365mailforward, get-o365mailforward, disable-o365access, enable-o365access, add-calendarreviewer
+Export-ModuleMember check-o365status, enable-o365mailforward, connect-o365, disable-o365mailforward, get-o365mailforward, disable-o365access, enable-o365access, add-calendarreviewer, update-o365primarymail
 
 
 
