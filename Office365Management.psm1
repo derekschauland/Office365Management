@@ -16,13 +16,30 @@
 
 function connect-o365
 {
-	$credential = Get-Credential -Message "Enter the O365 login for the customer you need to work with"
+	
+	foreach ($session in (Get-PSSession | where { $_.configurationname -eq "Microsoft.exchange" }))
+	{
+			Write-Host "$session will be removed."
+			$session | remove-pssession
+		}
+		
+		$credential = Get-Credential -Message "Enter the O365 login for the customer you need to work with"
 	
 	$exsession = New-PSSession -ConfigurationName "Microsoft.Exchange" -ConnectionUri "https://ps.outlook.com/powershell" -Credential $credential -Authentication basic -AllowRedirection
 	
-	Export-PSSession -Session $exsession -OutputModule "ExchOnline"
+	Export-PSSession -Session $exsession -OutputModule "ExchOnline" -AllowClobber -Force
 	
-	Import-Module exchonline
+	if (!(Get-Module ExchOnline))
+	{
+		Import-Module exchonline -DisableNameChecking | Write-Output $null
+	}
+	else
+	{
+		Get-Module exchonline | Remove-Module 	
+	}
+	
+	Import-Module exchonline -DisableNameChecking | Write-Output $null
+	
 	
 }
 
@@ -34,7 +51,7 @@ function enable-o365mailforward
 		[switch]$keepcopy
 	)
 	
-	if(get-mailbox -identity $emailaddress | fl forwardingsmtpaddress, delivertomailboxandforward, identity)
+	if(get-pssession | where { $_.configurationname -eq "Microsoft.Exchange" }])
 	{
 		$current = get-mailbox -identity $emailaddress | fl forwardingsmtpaddress, delivertomailboxandforward, identity
 	}
@@ -279,8 +296,35 @@ function check-o365status
 	
 }
 
+function update-o365primarymail
+{
+	param ([string[]]$emailaddress)
+	
+	foreach ($addr in $emailaddress)
+	{
+		
+		$mailbox = get-mailbox $addr
+		
+		foreach ($mbx in $mailbox)
+		{
+			if ($mbx.windowsemailaddress -match "onmicrosoft.com")
+			{
+				$oldemail = $mbx.windowsemailaddress
+				
+				$mbx | set-mailbox -windowsmailaddress $mbx.userprinicpalname
+				
+				Write-Host "The Office 365 account for $($mbx.displayname) has been modified to change $oldemail to $($mbx.windowsemailaddress)"
+			}
+			else
+			{
+				Write-Host "The Office 365 account for $($mbx.displayname) already has the correct Email address - no changes needed/made."
+			}
+		}
+	}
+	
+}
 
-Export-ModuleMember check-o365status, enable-o365mailforward, connect-o365, disable-o365mailforward, get-o365mailforward, disable-o365access, enable-o365access, add-calendarreviewer
+Export-ModuleMember check-o365status, enable-o365mailforward, connect-o365, disable-o365mailforward, get-o365mailforward, disable-o365access, enable-o365access, add-calendarreviewer, update-o365primarymail
 
 
 
