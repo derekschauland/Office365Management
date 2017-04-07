@@ -16,13 +16,30 @@
 
 function connect-o365
 {
-	$credential = Get-Credential -Message "Enter the O365 login for the customer you need to work with"
+	
+	foreach ($session in (Get-PSSession | where { $_.configurationname -eq "Microsoft.exchange" }))
+	{
+			Write-Host "$session will be removed."
+			$session | remove-pssession
+		}
+		
+		$credential = Get-Credential -Message "Enter the O365 login for the customer you need to work with"
 	
 	$exsession = New-PSSession -ConfigurationName "Microsoft.Exchange" -ConnectionUri "https://ps.outlook.com/powershell" -Credential $credential -Authentication basic -AllowRedirection
 	
-	Export-PSSession -Session $exsession -OutputModule "ExchOnline"
+	Export-PSSession -Session $exsession -OutputModule "ExchOnline" -AllowClobber -Force
 	
-	Import-Module exchonline
+	if (!(Get-Module ExchOnline))
+	{
+		Import-Module exchonline -DisableNameChecking | Write-Output $null
+	}
+	else
+	{
+		Get-Module exchonline | Remove-Module 	
+	}
+	
+	Import-Module exchonline -DisableNameChecking | Write-Output $null
+	
 	
 }
 
@@ -34,7 +51,7 @@ function enable-o365mailforward
 		[switch]$keepcopy
 	)
 	
-	if(get-mailbox -identity $emailaddress | fl forwardingsmtpaddress, delivertomailboxandforward, identity)
+	if(get-pssession | where { $_.configurationname -eq "Microsoft.Exchange" }])
 	{
 		$current = get-mailbox -identity $emailaddress | fl forwardingsmtpaddress, delivertomailboxandforward, identity
 	}
@@ -283,7 +300,7 @@ function update-o365primarymail
 {
 	param ([string[]]$emailaddress)
 	
-	$mailbox = get-mailbox -userprincipalname $emailaddress
+	$mailbox = get-mailbox $emailaddress
 	
 	foreach ($mbx in $mailbox)
 	{
